@@ -17,7 +17,7 @@ App listening at http://localhost:3000
 この状態で，現ディレクトリにて以下を実行します．
 -t は録画時間（秒） test.mp4は適宜書き換えてください．
 ```
-$ ffmpeg -protocol_whitelist file,http,https,tcp,tls,crypto -t 60 -i start.m3u8 test4.mp4
+$ ffmpeg -protocol_whitelist file,http,https,tcp,tls,crypto -t 60 -i http://localhost:3000/start.m3u8 test.mp4
 ```
 # 今後の予定
 超A&G用の録画サーバー向けツール（Linux上で動作）するようなものを作る予定です，  

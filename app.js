@@ -17,9 +17,7 @@ const axios = axiosBase.create({
 app.get('/start.m3u8', (req, res) => {
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
-
-    const finalM3u8 = `#EXTM3U\n#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=242455\nhttp://localhost:3000/aandg1.m3u8`
-
+    const finalM3u8 = `#EXTM3U\n#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=242455\nhttp://localhost:${port}/aandg1.m3u8`;
     res.end(finalM3u8);
 });
 
