@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>超A&G録画ページ</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.10.4/dayjs.min.js"
+        integrity="sha512-0fcCRl828lBlrSCa8QJY51mtNqTcHxabaXVLPgw/jPA5Nutujh6CbTdDgRzl9aSPYW/uuE7c4SffFUQFBAy6lg=="
+        crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.10.7/locale/ja.min.js"
+        integrity="sha512-Wnlqvn3V+CPGlJmU+hUsxrDp3S4KKIF7eqlYbPOtAipIOQRHTjk1oZuXvRfaFOZhGmw6leo/V5SqES583KTUDg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css">
+</head>
+
+<body>
+    <div id="app">
+        <div class="container">
+            <section class="section">
+                <div class="content">
+                    <h1 class="title">超A&G録画ページ</h1>
+                    <p>簡易的に超A&Gの録画予約ができます
+                        <br>ソースコードは<a
+                            href="https://github.com/takonasu/A-GRecordingTool">こちら</a>で公開されています。機能追加やバグ報告などコントリビュートをお待ちしています。<br>
+                    </p>
+
+                    <h2 class="subtitle">今後の放送</h2>
+                    <div v-for="program in todayProgramList" :key="program.title"
+                        v-if="dayjs().isBefore(dayjs(program.to))" class="card" style="margin:10px;"
+                        v-on:click="modalInfo.title=program.title;modalInfo.pfm=program.pfm;modalInfo.view=true;modalInfo.ft=program.ft;modalInfo.to=program.to;modalInfo.dur=program.dur;">
+                        <div class="card-content">
+                            <div class="content">
+                                <p class="title is-4">
+                                    {{ program.title }} </p>
+                                <p class="subtitle is-6">{{ program.pfm }}</p>
+                                <p>
+                                    開始：{{ convertDate(program.ft) }} <br>
+                                    終了：{{ convertDate(program.to) }} <br>
+                                </p>
+                            </div>
+                        </div>
+
+
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="modal is-active" v-if="modalInfo.view">
+            <div class="modal-background" v-on:click="modalInfo.view=false"></div>
+            <div class="modal-card">
+                <header class="modal-card-head">
+                    <p class="modal-card-title">番組の録画予約</p>
+                    <button class="delete" aria-label="close" v-on:click="modalInfo.view=false"></button>
+                </header>
+                <section class="modal-card-body">
+                    <p class="title is-4">
+                        {{ modalInfo.title }} </p>
+                    <p class="subtitle is-6">{{ modalInfo.pfm }}</p>
+                    <p>
+                        開始：{{ convertDate(modalInfo.ft) }} <br>
+                        終了：{{ convertDate(modalInfo.to) }} <br>
+                        番組時間：{{modalInfo.dur}}分
+                    </p>
+                </section>
+                <footer class="modal-card-foot">
+                    <button class="button is-success is-active"
+                        v-on:click="requestRecord(modalInfo.title,modalInfo.ft,modalInfo.dur*60)">予約</button>
+                    <button class="button" v-on:click="modalInfo.view=false">閉じる</button>
+                </footer>
+            </div>
+        </div>
+
+    </div>
+</body>
+<script>
+    var app = new Vue({
+        el: "#app",
+        data: {
+            todayProgramList: [],
+            modalInfo: {
+                view: false,
+                title: "",
+                pfm: "",
+                ft: "",
+                to: "",
+                dur: ""
+            }
+        },
+        mounted: function () {
+            dayjs.locale('ja');
+            // fetch("http://localhost:3000/all")
+            fetch("./sample.json")
+                .then(response => response.json())
+                .then(data => (this.todayProgramList = data))
+        },
+        methods: {
+            convertDate: function (date) {
+                return dayjs(date).format('YYYY年MM月DD日(dd) HH時mm分')
+            },
+            // programTime 秒
+            requestRecord: function (name, start, programTime) {
+                const formattedStartTime = dayjs(start).format('YYYY-MM-DDTHH:mm:ss');
+                const params = { // 渡したいパラメータをJSON形式で書く
+                    time: programTime,
+                    name: name,
+                    start: formattedStartTime,
+                };
+                const query_params = new URLSearchParams(params);
+                fetch("./schedule?" + query_params)
+                    .then(response => response.json())
+                    .then(response => {
+                        console.log(response)
+                    });
+            }
+        }
+    })
+</script>
+<style>
+    /* @import url(//fonts.googleapis.com/earlyaccess/notosansjapanese.css);
+
+    html {
+        font-family: "Noto Sans Japanese", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+    }
+
+    .mycard {
+        background-color: #3299e9;
+        padding: 1rem;
+    } */
+    body {
+        background-color: #f5f5f5;
+    }
+</style>
+
+</html>
