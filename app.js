@@ -3,6 +3,8 @@ const axiosBase = require('axios');
 const { exec } = require('child_process');
 const app = express();
 const schedule = require('node-schedule');
+const fs = require('fs');
+let dayjs = require('dayjs')
 
 
 const port = 4000;
@@ -11,7 +13,11 @@ const AGServer = `https://icraft.hs.llnwd.net`;
 // m3u8ファイルを提供しているサーバー
 const m3u8BaseURL = `https://fms2.uniqueradio.jp`;
 
-app.use(express.static('public'));
+app.use(function (req, res, next) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET');
+    next();
+});
 
 // ffmpeg等へ録画を始めるためのm3u8ファイルを提供
 app.get('/start.m3u8', (req, res) => {
@@ -57,7 +63,7 @@ app.get('/record', (req, res) => {
 });
 
 // 番組表APIへ代理アクセスして返却
-app.get('/all?isRepeat=true', (req, res) => {
+app.get('/all', (req, res) => {
     res.setHeader('Content-Type', 'application/json');
 
     const axios = axiosBase.create({
@@ -67,7 +73,7 @@ app.get('/all?isRepeat=true', (req, res) => {
         },
         responseType: 'json'
     });
-    axios.get('all')
+    axios.get('all?isRepeat=true')
         .then(function (response) {
             console.log(response.data);
             res.statusCode = 200;
@@ -88,7 +94,6 @@ app.get('/all?isRepeat=true', (req, res) => {
 // length: 秒
 */
 app.get('/schedule', (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Content-Type', 'application/json');
     if (!req.query.start || !req.query.name || !req.query.length) {
         res.statusCode = 400;
@@ -107,11 +112,17 @@ app.get('/schedule', (req, res) => {
         res.end(`{"error": "指定された録画開始時刻を過ぎています．"}`);
         return;
     }
-    addRecordingSchedule(req.query.name, req.query.start, req.query.length);
+    addRecordingSchedule(req.query.name, req.query.start, req.query.length, true);
     res.statusCode = 200;
     res.end(`{"message": "OK"}`);
 });
 
+// 予約情報を返却
+app.get('/scheduleInfo', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.statusCode = 200;
+    res.end(JSON.stringify(getRecordInfo()));
+});
 
 app.listen(port, () => {
     console.log(`App listening at http://localhost:${port}`);
@@ -121,8 +132,9 @@ app.listen(port, () => {
 // programName: 番組名
 // recordStartTime: 2021-09-27T11:23:30
 // programTimeLength: 秒
+// addRecordDataToJson: Boolean
 */
-function addRecordingSchedule(programName, recordStartTime, programTimeLength) {
+function addRecordingSchedule(programName, recordStartTime, programTimeLength, addRecordDataToJson) {
 
     if (!recordStartTime.match(/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}/)) {
         console.log("開始時間のフォーマットが不正です．");
@@ -143,6 +155,14 @@ function addRecordingSchedule(programName, recordStartTime, programTimeLength) {
         startRecord(programTimeLength, outputName);
     });
     console.log(`録画受付\n番組名：${programName}\n録画開始時間：${recordStartTime}\n番組の長さ：${programTimeLength}`);
+    if (addRecordDataToJson) {
+        addRecordInfo({
+            "programName": programName,
+            "startTime": recordStartTime,
+            "programLength": programTimeLength,
+            "recorded": false
+        })
+    }
 }
 
 
@@ -162,3 +182,36 @@ function startRecord(programTimeLength, outputName) {
         console.log(`stdout: ${stdout}`)
     });
 }
+
+// 録画予約情報を取得して返す
+function getRecordInfo() {
+    return require('./record.json');
+}
+
+// 録画予約情報をJSONファイルに書き込む
+function writeRecordInfo(data) {
+    fs.writeFile('./record.json', JSON.stringify(data, null, '    '), (err) => {
+        if (err) console.log(`error!::${err}`);
+    });
+}
+
+// 録画情報をJSONファイルに追加する
+function addRecordInfo(data) {
+    let record = getRecordInfo();
+    record.push(data);
+    writeRecordInfo(record);
+}
+
+// 起動時の処理
+function startProcess() {
+    // 録画情報を取得して現在が録画開始時刻前である番組をスケジューリングする
+    const record = getRecordInfo();
+    const schedulePrograms = record.filter(elm => {
+        return dayjs().isBefore(dayjs(elm.startTime))
+    })
+    schedulePrograms.forEach(elm => {
+        if (elm.recorded == false)
+            addRecordingSchedule(elm.programName, elm.startTime, elm.programLength, false);
+    })
+}
+startProcess();
