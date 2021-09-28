@@ -112,7 +112,21 @@ app.get('/schedule', (req, res) => {
         res.end(`{"error": "指定された録画開始時刻を過ぎています．"}`);
         return;
     }
-    addRecordingSchedule(req.query.name, req.query.start, req.query.length, true);
+
+
+    const record = getRecordInfo();
+    // 既にデータが登録されている場合は登録しない
+    const duplicateData = record.filter(elm => {
+        return elm.startTime === req.query.start;
+    });
+    if (duplicateData.length != 0) {
+        res.statusCode = 400;
+        res.end(`{"error": "既に予約済みです"}`);
+        console.log("既に予約済みです．");
+        return;
+    }
+
+    addRecordingSchedule(req.query.name, req.query.start, req.query.length);
     res.statusCode = 200;
     res.end(`{"message": "OK"}`);
 });
@@ -132,9 +146,8 @@ app.listen(port, () => {
 // programName: 番組名
 // recordStartTime: 2021-09-27T11:23:30
 // programTimeLength: 秒
-// addRecordDataToJson: Boolean
 */
-function addRecordingSchedule(programName, recordStartTime, programTimeLength, addRecordDataToJson) {
+function addRecordingSchedule(programName, recordStartTime, programTimeLength) {
 
     if (!recordStartTime.match(/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}/)) {
         console.log("開始時間のフォーマットが不正です．");
@@ -153,16 +166,20 @@ function addRecordingSchedule(programName, recordStartTime, programTimeLength, a
         // 出力ファイル名
         const outputName = `${recordStartTime}_${programName}.mp4`;
         startRecord(programTimeLength, outputName);
+        let record = getRecordInfo();
+        const index = record.findIndex(elm => {
+            return elm.startTime === recordStartTime;
+            })
+        record[index].recorded = true;
+        writeRecordInfo(record);
     });
     console.log(`録画受付\n番組名：${programName}\n録画開始時間：${recordStartTime}\n番組の長さ：${programTimeLength}`);
-    if (addRecordDataToJson) {
-        addRecordInfo({
-            "programName": programName,
-            "startTime": recordStartTime,
-            "programLength": programTimeLength,
-            "recorded": false
-        })
-    }
+    addRecordInfo({
+        "programName": programName,
+        "startTime": recordStartTime,
+        "programLength": programTimeLength,
+        "recorded": false
+    })
 }
 
 
@@ -179,7 +196,6 @@ function startRecord(programTimeLength, outputName) {
             console.log(`stderr: ${stderr}`)
             return
         }
-        console.log(`stdout: ${stdout}`)
     });
 }
 
@@ -198,6 +214,13 @@ function writeRecordInfo(data) {
 // 録画情報をJSONファイルに追加する
 function addRecordInfo(data) {
     let record = getRecordInfo();
+    // 既にデータが登録されている場合は登録しない
+    const duplicateData = record.filter(elm => {
+        return elm.startTime === data.startTime;
+    });
+    if (duplicateData.length != 0) {
+        return;
+    }
     record.push(data);
     writeRecordInfo(record);
 }
@@ -210,8 +233,9 @@ function startProcess() {
         return dayjs().isBefore(dayjs(elm.startTime))
     })
     schedulePrograms.forEach(elm => {
-        if (elm.recorded == false)
-            addRecordingSchedule(elm.programName, elm.startTime, elm.programLength, false);
+        if (elm.recorded == false){
+            addRecordingSchedule(elm.programName, elm.startTime, elm.programLength);
+        }
     })
 }
 startProcess();
