@@ -5,7 +5,7 @@ const app = express();
 const schedule = require('node-schedule');
 
 
-const port = 3000;
+const port = 4000;
 // 実際のts動画ファイルを提供しているサーバー
 const AGServer = `https://icraft.hs.llnwd.net`;
 // m3u8ファイルを提供しているサーバー
@@ -23,8 +23,6 @@ app.get('/start.m3u8', (req, res) => {
 
 // ffmpeg等へA&Gサーバからの内容を書き換えて最新のm3u8ファイルを提供．
 app.get('/aandg1.m3u8', (req, res) => {
-    res.statusCode = 200;
-    res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
 
     const axios = axiosBase.create({
         baseURL: m3u8BaseURL,
@@ -32,29 +30,34 @@ app.get('/aandg1.m3u8', (req, res) => {
     axios.get('agqr10/aandg1.m3u8')
         .then(function (response) {
             const finalM3u8 = response.data.replace(/(aandg1-[0-9]{13}.ts)/g, `${AGServer}/agqr10/$1`);
-            // console.log(finalM3u8);
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
             res.end(finalM3u8);
         })
         .catch(function (error) {
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(`{"error": "ERROR!! occurred in Backend."}`);
             console.log('ERROR!! occurred in Backend.\n' + error);
         });
 });
 
 // ffmpegで録画を実行．
 app.get('/record', (req, res) => {
-    res.statusCode = 200;
+
     res.setHeader('Content-Type', 'application/json');
     if (!req.query.time || !req.query.name) {
+        res.statusCode = 400;
         res.end(`{"error": "timeとnameパラメータを指定してください．"}`);
         return;
     }
     startRecord(req.query.time, req.query.name);
+    res.statusCode = 200;
     res.end(`{"message": "OK"}`);
 });
 
 // 番組表APIへ代理アクセスして返却
-app.get('/all', (req, res) => {
-    res.statusCode = 200;
+app.get('/all?isRepeat=true', (req, res) => {
     res.setHeader('Content-Type', 'application/json');
 
     const axios = axiosBase.create({
@@ -67,9 +70,12 @@ app.get('/all', (req, res) => {
     axios.get('all')
         .then(function (response) {
             console.log(response.data);
+            res.statusCode = 200;
             res.end(JSON.stringify(response.data));
         })
         .catch(function (error) {
+            res.statusCode = 500;
+            res.end(`{"error": "ERROR!! occurred in Backend."}`);
             console.log('ERROR!! occurred in Backend.\n' + error);
         });
 });
@@ -79,26 +85,30 @@ app.get('/all', (req, res) => {
 /* 予約録画を受け付ける
 // name: 番組名
 // start: 2021-09-27T11:23:30
-// time: 秒
+// length: 秒
 */
 app.get('/schedule', (req, res) => {
-    res.statusCode = 200;
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Content-Type', 'application/json');
-    if (!req.query.start || !req.query.name || !req.query.time) {
-        res.end(`{"error": "time,name,startパラメータを指定してください．"}`);
+    if (!req.query.start || !req.query.name || !req.query.length) {
+        res.statusCode = 400;
+        res.end(`{"error": "length,name,startパラメータを指定してください．"}`);
         return;
     }
 
     if (!req.query.start.match(/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}/)) {
+        res.statusCode = 400;
         res.end(`{"error": "startパラメータが不正です．例：2021-09-27T11:23:30"}`);
         return;
     }
 
     if (Date.parse(req.query.start) < new Date().getTime()) {
+        res.statusCode = 400;
         res.end(`{"error": "指定された録画開始時刻を過ぎています．"}`);
         return;
     }
-    addRecordingSchedule(req.query.name, req.query.start, req.query.time);
+    addRecordingSchedule(req.query.name, req.query.start, req.query.length);
+    res.statusCode = 200;
     res.end(`{"message": "OK"}`);
 });
 
@@ -108,43 +118,43 @@ app.listen(port, () => {
 })
 
 /* 録画予約をする関数
-// name: 番組名
-// start: 2021-09-27T11:23:30
-// recordingTime: 秒
+// programName: 番組名
+// recordStartTime: 2021-09-27T11:23:30
+// programTimeLength: 秒
 */
-function addRecordingSchedule(name, datestr, recordingTime) {
+function addRecordingSchedule(programName, recordStartTime, programTimeLength) {
 
-    if (!datestr.match(/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}/)) {
+    if (!recordStartTime.match(/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}/)) {
         console.log("開始時間のフォーマットが不正です．");
         return;
     }
 
-    if (Date.parse(datestr) < new Date().getTime()) {
+    if (Date.parse(recordStartTime) < new Date().getTime()) {
         console.log("指定された録画開始時刻を過ぎています．");
         return;
     }
 
-    const rule = Date.parse(datestr);
+    const rule = Date.parse(recordStartTime);
     rule.tz = "Asia/Tokyo";
     const job = schedule.scheduleJob(rule, function () {
-        console.log(`録画開始\n番組名：${name}\n録画開始時間：${datestr}\n番組の長さ：${recordingTime}`);
+        console.log(`録画開始\n番組名：${programName}\n録画開始時間：${recordStartTime}\n番組の長さ：${programTimeLength}`);
         // 出力ファイル名
-        const outputName = `${datestr}_${name}.mp4`;
-        startRecord(recordingTime, outputName);
+        const outputName = `${recordStartTime}_${programName}.mp4`;
+        startRecord(programTimeLength, outputName);
     });
-    console.log(`録画受付\n番組名：${name}\n録画開始時間：${datestr}\n番組の長さ：${recordingTime}`);
+    console.log(`録画受付\n番組名：${programName}\n録画開始時間：${recordStartTime}\n番組の長さ：${programTimeLength}`);
 }
 
 
 /* 録画を開始する関数
 // outputName: 出力ファイル名
-// recordingTime: 秒
+// programTimeLength: 秒
 */
-function startRecord(recordingTime, outputName) {
+function startRecord(programTimeLength, outputName) {
     // 記号をエスケープ（インジェクション対策）
-    recordingTime = recordingTime.replace(/[^0-9]+/g, ``);
+    programTimeLength = programTimeLength.replace(/[^0-9]+/g, ``);
     outputName = outputName.replace(/[!-,:-@[-^'{-~/ ]/g, ``);
-    exec(`ffmpeg -protocol_whitelist file,http,https,tcp,tls,crypto -t ${recordingTime} -i http://localhost:${port}/start.m3u8 ${outputName}`, (err, stdout, stderr) => {
+    exec(`ffmpeg -protocol_whitelist file,http,https,tcp,tls,crypto -t ${programTimeLength} -i http://localhost:${port}/start.m3u8 ${outputName}`, (err, stdout, stderr) => {
         if (err) {
             console.log(`stderr: ${stderr}`)
             return
