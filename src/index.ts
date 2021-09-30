@@ -67,27 +67,6 @@ const expressApp = async () => {
         res.status(200).json({ message: 'OK' });
     });
 
-    // 番組表APIへ代理アクセスして返却
-    app.get('/all', (req, res) => {
-        res.setHeader('Content-Type', 'application/json');
-        const axios = axiosBase.create({
-            baseURL: `https://agqr.sun-yryr.com/api`,
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            responseType: 'json',
-        });
-        axios
-            .get('all?isRepeat=true')
-            .then(function (response) {
-                res.status(200).json(response.data);
-            })
-            .catch(function (error) {
-                res.status(500).json({ error: 'ERROR!! occurred in Backend.' });
-                console.log('ERROR!! occurred in Backend.\n' + error);
-            });
-    });
-
     /*
     // 予約録画を受け付ける
     // name: 番組名
