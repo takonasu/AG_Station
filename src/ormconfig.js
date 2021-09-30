@@ -8,11 +8,8 @@ module.exports = {
     "synchronize": true,
     "logging": false,
     "entities": ["entities/**/*.ts"],
-    "migrations": ["models/migrations/**/*.ts"],
-    "subscribers": ["models/subscribers/**/*.ts"],
     "cli": {
        "entitiesDir": "entities",
-       "migrationsDir": "models/migrations",
-       "subscribersDir": "models/subscribers"
     }
  }
+ 
