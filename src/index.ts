@@ -20,11 +20,6 @@ const expressApp = async () => {
 
     BaseEntity.useConnection(connection);
 
-    // CORSの許可
-    app.use((req, res, next) => {
-        res.header('Access-Control-Allow-Origin', '*');
-        next();
-    });
     // body-parserに基づいた着信リクエストの解析
     app.use(express.json());
     app.use(express.urlencoded({ extended: true }));
@@ -85,7 +80,6 @@ const expressApp = async () => {
         axios
             .get('all?isRepeat=true')
             .then(function (response) {
-                console.log(response.data);
                 res.status(200).json(response.data);
             })
             .catch(function (error) {
@@ -150,6 +144,21 @@ const expressApp = async () => {
         res.status(200).json(records);
     });
 
+    // 予約キャンセル
+    app.delete('/scheduleCancel', async (req, res) => {
+        const record = await Record.findOne({
+            id: req.body.id as string,
+        });
+        if (record) {
+            deleteSchedule(req.body.id as string);
+            res.status(200).json({ message: 'OK' });
+        } else {
+            res.status(400).json({
+                error: 'idパラメータが不正です．/scheduleInfo で取得できるIDを指定してください．',
+            });
+        }
+    });
+
     app.listen(port, () => {
         console.log(`Example app listening on port ${port}`);
     });
@@ -173,7 +182,8 @@ const expressApp = async () => {
         ]);
     }
 
-    /* 録画予約をする関数
+    /*
+    // 録画予約をする関数
     // programName: 番組名
     // recordStartTime: 番組開始時間
     // programTimeLength: 秒
@@ -183,33 +193,9 @@ const expressApp = async () => {
             console.log('指定された録画開始時刻を過ぎています．');
             return;
         }
-
-        schedule.scheduleJob(recordStartTime, async function () {
-            console.log(
-                `録画開始\n番組名：${programName}\n録画開始時間：${dayjs(recordStartTime).format(
-                    'YYYY年MM月DD日HH時mm分'
-                )}\n番組の長さ：${programTimeLength}`
-            );
-
-            const record = await Record.findOne({
-                program_name: programName,
-                start_time: recordStartTime,
-                program_length: programTimeLength,
-                recorded: false,
-            });
-
-            if (record) {
-                record.recorded = true;
-                await record.save();
-            }
-
-            // 出力ファイル名
-            const outputName = `${dayjs(recordStartTime).format('YYYY年MM月DD日HH時mm分')}_${programName}.mp4`;
-            startRecord(programTimeLength, outputName);
-        });
-
+        // DBに予約情報が存在するか確認
         if (!(await checkRecord(recordStartTime))) {
-            // DBに情報を追加
+            // 無ければDBに情報を追加
             const record = new Record();
             record.program_name = programName;
             record.start_time = recordStartTime;
@@ -218,11 +204,66 @@ const expressApp = async () => {
             await record.save();
         }
 
+        const record = await Record.findOne({
+            program_name: programName,
+            start_time: recordStartTime,
+            program_length: programTimeLength,
+            recorded: false,
+        });
+        if (record) {
+            // 第一引数にユニークな名前を付けることでキャンセルに対応させる
+            schedule.scheduleJob(record.id, recordStartTime, async function () {
+                console.log(
+                    `録画開始\n番組名：${programName}\n録画開始時間：${dayjs(recordStartTime).format(
+                        'YYYY年MM月DD日HH時mm分'
+                    )}\n番組の長さ：${programTimeLength}`
+                );
+
+                const record = await Record.findOne({
+                    program_name: programName,
+                    start_time: recordStartTime,
+                    program_length: programTimeLength,
+                    recorded: false,
+                });
+
+                if (record) {
+                    record.recorded = true;
+                    await record.save();
+                }
+
+                // 出力ファイル名
+                const outputName = `${dayjs(recordStartTime).format('YYYY年MM月DD日HH時mm分')}_${programName}.mp4`;
+                startRecord(programTimeLength, outputName);
+            });
+        }
+
         console.log(
             `録画受付\n番組名：${programName}\n録画開始時間：${dayjs(recordStartTime).format(
                 'YYYY年MM月DD日HH時mm分'
             )}\n番組の長さ：${programTimeLength}`
         );
+    }
+
+    /* 
+    // 予約ジョブをnode-scheduleからキャンセルしてDBから消去する関数
+    // id: キャンセルしたいジョブのUUID，DBのUUIDと同一．
+    */
+    async function deleteSchedule(id: string) {
+        const record = await Record.findOne({
+            id: id,
+        });
+        if (record) {
+            // 録画開始時刻を過ぎているものに関してはDBののみ消去
+            if (dayjs().isAfter(dayjs(record.start_time))) {
+                await record.remove();
+            } else if (record.recorded == false) {
+                schedule.scheduledJobs[id].cancel();
+                await record.remove();
+            } else {
+                // 録画開始時刻を過ぎていないのに録画済みになってるヤバい奴はデータ不整合の可能性があるため消す
+                await record.remove();
+            }
+        }
     }
 
     /* 

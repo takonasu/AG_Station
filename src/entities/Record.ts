@@ -2,8 +2,8 @@ import { Entity, PrimaryGeneratedColumn, Column, BaseEntity } from 'typeorm';
 
 @Entity()
 export class Record extends BaseEntity {
-    @PrimaryGeneratedColumn()
-    public id: number;
+    @PrimaryGeneratedColumn('uuid')
+    public id: string;
 
     @Column()
     public program_name: string;
