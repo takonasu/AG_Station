@@ -18,7 +18,6 @@ const expressApp = async () => {
     const connectionOptions = await getConnectionOptions();
     const connection = await createConnection(connectionOptions);
 
-    // ActiveRecordパターンでTypeORMを使用する場合
     BaseEntity.useConnection(connection);
 
     // CORSの許可
@@ -31,13 +30,6 @@ const expressApp = async () => {
     app.use(express.urlencoded({ extended: true }));
 
     app.get('/', async (req, res) => {
-        const record = new Record();
-        record.program_name = '指出毬亜のさしでがましいようですが';
-        record.start_time = dayjs('2021-09-29T19:30:00').toDate();
-        record.program_length = 1800;
-        record.recorded = false;
-        await record.save();
-
         const records = await Record.find();
         res.send(records);
     });
@@ -103,11 +95,11 @@ const expressApp = async () => {
     });
 
     /*
-// 予約録画を受け付ける
-// name: 番組名
-// start: 2021-09-27T11:23:30
-// length: 秒
-*/
+    // 予約録画を受け付ける
+    // name: 番組名
+    // start: 2021-09-27T11:23:30
+    // length: 秒
+    */
     app.get('/schedule', async (req, res) => {
         res.setHeader('Content-Type', 'application/json');
         if (!req.query.start || !req.query.name || !req.query.length) {
@@ -163,10 +155,10 @@ const expressApp = async () => {
     });
 
     /*
-// 録画を開始する関数
-// outputName: 出力ファイル名
-// programTimeLength: 秒
-*/
+    // 録画を開始する関数
+    // outputName: 出力ファイル名
+    // programTimeLength: 秒
+    */
     function startRecord(programTimeLength: number, outputName: string) {
         // 記号をエスケープ（インジェクション対策）
         outputName = outputName.replace(/[!-,:-@[-^'{-~/ ]/g, ``);
@@ -182,32 +174,45 @@ const expressApp = async () => {
     }
 
     /* 録画予約をする関数
-// programName: 番組名
-// recordStartTime: 番組開始時間
-// programTimeLength: 秒
-*/
+    // programName: 番組名
+    // recordStartTime: 番組開始時間
+    // programTimeLength: 秒
+    */
     async function addRecordingSchedule(programName: string, recordStartTime: Date, programTimeLength: number) {
         if (dayjs().isAfter(dayjs(recordStartTime))) {
             console.log('指定された録画開始時刻を過ぎています．');
             return;
         }
 
-        schedule.scheduleJob(recordStartTime, function () {
+        schedule.scheduleJob(recordStartTime, async function () {
             console.log(
                 `録画開始\n番組名：${programName}\n録画開始時間：${dayjs(recordStartTime).format(
                     'YYYY年MM月DD日HH時mm分'
                 )}\n番組の長さ：${programTimeLength}`
             );
+
+            const record = await Record.findOne({
+                program_name: programName,
+                start_time: recordStartTime,
+                program_length: programTimeLength,
+                recorded: false,
+            });
+
+            if (record) {
+                record.recorded = true;
+                await record.save();
+            }
+
             // 出力ファイル名
             const outputName = `${dayjs(recordStartTime).format('YYYY年MM月DD日HH時mm分')}_${programName}.mp4`;
             startRecord(programTimeLength, outputName);
         });
 
-        if (!(await checkRecord(dayjs(recordStartTime).toDate()))) {
+        if (!(await checkRecord(recordStartTime))) {
             // DBに情報を追加
             const record = new Record();
             record.program_name = programName;
-            record.start_time = dayjs(recordStartTime).toDate();
+            record.start_time = recordStartTime;
             record.program_length = programTimeLength;
             record.recorded = false;
             await record.save();
@@ -235,15 +240,13 @@ const expressApp = async () => {
     // 起動時に実行する．DBに入っている予約情報をジョブに再登録する．
     */
     async function startProcess() {
-        const records = await Record.find();
-        const nonRecorded = records.filter((elm) => {
-            return elm.recorded == false;
+        const records = await Record.find({
+            recorded: false,
         });
-        nonRecorded.forEach((elm) => {
+        records.forEach((elm) => {
             addRecordingSchedule(elm.program_name, elm.start_time, elm.program_length);
         });
     }
-
     startProcess();
 };
 
