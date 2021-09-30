@@ -1,7 +1,7 @@
 version: "3"
 services:
   mysql:
-    image: mysql:5.7.35
+    image: mysql/mysql-server:5.7.35
     container_name: AGRecordToolMySQL
     env_file: ./mysql/mysql.env
     #環境変数設定。タイムゾーンを日本時間に設定。
@@ -11,9 +11,7 @@ services:
       - "3306:3306"
     volumes:
       #mysqlのデフォルト設定ファイルを上書き。:roでコンテナ側からは読み取り専用設定。
-      - ./mysql/conf:/etc/mysql/conf.d/:ro
-      #mysqldataにマウントすることで、コンテナを削除してもデーターは残るように設定。
-      - mysqldata:/var/lib/mysql
+      - ./mysql/conf:/etc/mysql/:ro
     networks:
       - backend
 
