@@ -1,0 +1,46 @@
+version: "3"
+services:
+  mysql:
+    image: mysql:5.7.35
+    container_name: AGRecordToolMySQL
+    env_file: ./mysql/mysql.env
+    #環境変数設定。タイムゾーンを日本時間に設定。
+    environment:
+      - TZ=Asia/Tokyo
+    ports:
+      - "3306:3306"
+    volumes:
+      #mysqlのデフォルト設定ファイルを上書き。:roでコンテナ側からは読み取り専用設定。
+      - ./mysql/conf:/etc/mysql/conf.d/:ro
+      #mysqldataにマウントすることで、コンテナを削除してもデーターは残るように設定。
+      - mysqldata:/var/lib/mysql
+    networks:
+      - backend
+
+  app:
+    # dockerimageのファイルを指定
+    build: .
+    # コンテナ名
+    container_name: AGRecordToolBackend
+    env_file: ./app.env
+    environment:
+      - TZ=Asia/Tokyo
+      - DEBUG=app:*
+    tty: true
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./src:/app
+    working_dir: /app
+    #command: bash -c "npm install && npm run ts-node index.ts"
+    command: bash -c "npm run ts-node index.ts"
+    networks:
+      - backend
+    depends_on:
+      - mysql
+
+networks:
+  backend:
+
+volumes:
+  mysqldata:
