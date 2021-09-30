@@ -24,11 +24,6 @@ const expressApp = async () => {
     app.use(express.json());
     app.use(express.urlencoded({ extended: true }));
 
-    app.get('/', async (req, res) => {
-        const records = await Record.find();
-        res.send(records);
-    });
-
     // ffmpeg等へ録画を始めるためのm3u8ファイルを提供
     app.get('/start.m3u8', (req, res) => {
         res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
