@@ -17,10 +17,9 @@ services:
     networks:
       - backend
 
-  app:
+  backendapp:
     # dockerimageのファイルを指定
     build: .
-    # コンテナ名
     container_name: AGRecordToolBackend
     environment:
       - TZ=Asia/Tokyo
@@ -28,7 +27,7 @@ services:
     ports:
       - "4000:4000"
     volumes:
-      - ./src:/app
+      - ./src/backend:/app
     working_dir: /app
     command: bash -c "npm install && npm run ts-node index.ts"
     restart: always
@@ -38,6 +37,23 @@ services:
     depends_on:
       - mysql
 
+  frontendapp:
+    image: node:14.18.0
+    container_name: AGRecordToolFrontend
+    tty: true
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src/frontend:/app
+    working_dir: /app
+    command: bash -c "npm install && npm run build && npm run start"
+    mem_limit: 512m
+    restart: always
+    networks:
+      - backend
+    depends_on:
+      - backendapp
+      - mysql
 networks:
   backend:
 
