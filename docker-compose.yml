@@ -32,7 +32,7 @@ services:
     working_dir: /app
     command: bash -c "npm install && npm run ts-node index.ts"
     restart: always
-    mem_limit: 500m
+    mem_limit: 100m
     networks:
       - backend
     depends_on:
