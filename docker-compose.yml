@@ -13,7 +13,7 @@ services:
       #mysqlのデフォルト設定ファイルを上書き。:roでコンテナ側からは読み取り専用設定。
       - ./mysql/conf:/etc/mysql/:ro
     restart: always
-    mem_limit: 100m
+    mem_limit: 200m
     networks:
       - backend
 
