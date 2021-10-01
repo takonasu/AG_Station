@@ -12,6 +12,7 @@ services:
     volumes:
       #mysqlのデフォルト設定ファイルを上書き。:roでコンテナ側からは読み取り専用設定。
       - ./mysql/conf:/etc/mysql/:ro
+    restart: always
     networks:
       - backend
 
@@ -29,6 +30,7 @@ services:
       - ./src:/app
     working_dir: /app
     command: bash -c "npm install && npm run ts-node index.ts"
+    restart: always
     networks:
       - backend
     depends_on:
