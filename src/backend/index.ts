@@ -23,7 +23,8 @@ const expressApp = async () => {
     // body-parserに基づいた着信リクエストの解析
     app.use(express.json());
     app.use(express.urlencoded({ extended: true }));
-
+    // swaggerページの表示
+    app.use(express.static('swagger'));
     // ffmpeg等へ録画を始めるためのm3u8ファイルを提供
     app.get('/start.m3u8', (req, res) => {
         res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
