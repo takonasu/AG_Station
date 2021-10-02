@@ -5,6 +5,8 @@ import * as child_process from 'child_process';
 import { Record } from './entities/Record';
 import { getConnectionOptions, createConnection, BaseEntity } from 'typeorm';
 import schedule from 'node-schedule';
+import swaggerUi from 'swagger-ui-express';
+import swaggerDocument from './swagger.json';
 
 const expressApp = async () => {
     const app: express.Express = express();
@@ -24,7 +26,10 @@ const expressApp = async () => {
     app.use(express.json());
     app.use(express.urlencoded({ extended: true }));
     // swaggerページの表示
-    app.use(express.static('swagger'));
+    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+    app.get('/', (req, res) => {
+        res.redirect('/api-docs');
+    });
     // ffmpeg等へ録画を始めるためのm3u8ファイルを提供
     app.get('/start.m3u8', (req, res) => {
         res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
