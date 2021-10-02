@@ -145,15 +145,18 @@ const expressApp = async () => {
     function startRecord(programTimeLength: number, outputName: string) {
         // 記号をエスケープ（インジェクション対策）
         outputName = outputName.replace(/[!-,:-@[-^'{-~/ ]/g, ``);
-        child_process.spawn('ffmpeg', [
-            '-protocol_whitelist',
-            'file,http,https,tcp,tls,crypto',
-            '-t',
-            String(programTimeLength),
-            '-i',
-            `http://localhost:${port}/start.m3u8`,
-            `recorded/${outputName}`,
-        ]);
+        child_process.exec(
+            `ffmpeg -protocol_whitelist file,http,https,tcp,tls,crypto -t ${String(
+                programTimeLength
+            )} -i http://localhost:${port}/start.m3u8 recorded/${outputName}`,
+            (err, stdout, stderr) => {
+                if (err) {
+                    console.log(`録画エラー: ${stderr}`);
+                    return;
+                }
+                console.log(`録画終了: ${stdout}`);
+            }
+        );
     }
 
     /*
