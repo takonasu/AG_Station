@@ -11,7 +11,7 @@ services:
       - "3306:3306"
     volumes:
       #mysqlのデフォルト設定ファイルを上書き。:roでコンテナ側からは読み取り専用設定。
-      - ./mysql/conf:/etc/mysql/:ro
+      - ./mysql/conf:/etc/mysql:ro
       - ./mysql/db:/var/lib/mysql
     restart: always
     mem_limit: 512m
@@ -30,7 +30,6 @@ services:
     volumes:
       - ./src/backend:/app
     working_dir: /app
-    command: bash -c "npm install && npm run ts-node index.ts"
     restart: always
     mem_limit: 512m
     networks:
@@ -47,7 +46,6 @@ services:
     volumes:
       - ./src/frontend:/app
     working_dir: /app
-    command: bash -c "npm install && npm run build && npm run start"
     mem_limit: 512m
     restart: always
     networks:
